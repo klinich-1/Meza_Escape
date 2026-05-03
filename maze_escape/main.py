@@ -5,6 +5,7 @@ from typing import Optional, Sequence
 
 from maze_escape.self_test import run_self_test
 
+# Точка входа для запуска игры и самотестирования
 
 def run_game() -> int:
     try:
