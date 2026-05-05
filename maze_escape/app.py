@@ -20,6 +20,7 @@ from maze_escape.settings import (
     TILE,
 )
 
+# Основная игра управляет состоянием, обновлением и отрисовкой
 
 class Game:
     def __init__(self, pygame_module) -> None:
