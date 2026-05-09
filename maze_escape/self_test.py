@@ -15,6 +15,7 @@ def run_self_test() -> int:
     assert len(distances) == len(maze.floors), "maze must be fully connected"
 
     goal = max(distances, key=distances.get)
+    assert goal in distances, "goal must be reachable from start"
     path = astar(maze, start, goal)
     assert path[0] == start and path[-1] == goal, "A* must reach the farthest cell"
     assert all(maze.passable(cell) for cell in path), "A* path must avoid walls"
