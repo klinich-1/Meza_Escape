@@ -47,7 +47,7 @@ def generate_maze(cols: int, rows: int, rng: random.Random) -> Maze:
         visited.add((nx, ny))
         stack.append((nx, ny))
 
-    _add_extra_passages(grid, rng, cols * rows // 28)
+    _add_extra_passages(grid, rng, cols * rows // 26)
     return _grid_to_maze(grid, cols, rows)
 
 
