@@ -19,7 +19,7 @@ class Maze:
         return 0 <= x < self.cols and 0 <= y < self.rows
 
     def passable(self, cell: Cell) -> bool:
-        return self.in_bounds(cell) and cell not in self.walls
+        return self.in_bounds(cell) and cell in self.floors
 # Исправления
 
 # Комментарий к структуре лабиринта
