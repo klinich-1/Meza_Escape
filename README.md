@@ -43,4 +43,6 @@ maze_escape/
 - `generate_maze()` in `algorithms.py`: randomized DFS maze generation.
 - `astar()` in `algorithms.py`: enemy pathfinding.
 - `raycast_fov()` in `algorithms.py`: fog of war visibility.
+
+Разработано несколько проверок связности и качества карты, чтобы лабиринт всегда был проходимым и интересным.
 # Обновление от 3 мая
