@@ -187,6 +187,7 @@ class Game:
 
         target = self.find_escape_blink_target()
         if target == self.player:
+            self.message = "Нет доступной точки для телепорта"
             return
 
         self.player = target
