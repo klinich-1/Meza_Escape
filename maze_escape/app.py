@@ -171,6 +171,7 @@ class Game:
         dx, dy = direction
         target = (self.player[0] + dx, self.player[1] + dy)
         if not self.maze.passable(target):
+            self.message = "Блокировка стены"
             return False
 
         self.player = target
