@@ -27,6 +27,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if "--self-test" in args:
         return run_self_test()
 
+    # Запуск основного игрового цикла
     return run_game()
 # Main
 
