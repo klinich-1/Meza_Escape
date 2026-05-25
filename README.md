@@ -21,6 +21,8 @@ Run algorithm checks without opening the game window:
 python -m maze_escape --self-test
 ```
 
+Проект развивается по итерациям с пошаговыми правками игровых настроек, визуализации, генерации лабиринта и проверок.
+
 ## Structure
 
 ```text
