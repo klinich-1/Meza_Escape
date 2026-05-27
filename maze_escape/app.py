@@ -76,6 +76,7 @@ class Game:
 
     def run(self) -> None:
         while self.running:
+            # Цикл игры обновляет состояние и перерисовывает кадр
             dt = self.clock.tick(60) / 1000.0
             self.handle_events()
             self.update(dt)
