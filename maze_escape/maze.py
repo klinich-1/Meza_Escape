@@ -20,8 +20,3 @@ class Maze:
 
     def passable(self, cell: Cell) -> bool:
         return self.in_bounds(cell) and cell in self.floors
-# Исправления
-
-# Комментарий к структуре лабиринта
-
-# Уточнение метода проверки границ

@@ -18,7 +18,7 @@ def neighbors4(cell: Cell) -> Iterable[Cell]:
     yield x, y - 1
 
 
-def generate_maze(cols: int, rows: int, rng: random.Random) -> Maze:
+def generate_maze(cols: int, rows: int, rng: random.Random, extra_passages: Optional[int] = None) -> Maze:
     """Algorithm 1: randomized depth-first search maze generation."""
     grid = [[True for _ in range(cols)] for _ in range(rows)]
     start = (1, 1)
@@ -47,7 +47,10 @@ def generate_maze(cols: int, rows: int, rng: random.Random) -> Maze:
         visited.add((nx, ny))
         stack.append((nx, ny))
 
-    _add_extra_passages(grid, rng, cols * rows // 26)
+    if extra_passages is None:
+        extra_passages = cols * rows // 26
+
+    _add_extra_passages(grid, rng, extra_passages)
     return _grid_to_maze(grid, cols, rows)
 
 
@@ -191,10 +194,3 @@ def _reconstruct_path(
 
     path.reverse()
     return path
-# Улучшения алгоритма
-
-# Комментарий к алгоритму генерации и поиска
-
-# Оптимизация работы с очередью в A*
-
-# Комментарий к FOV-лучам
