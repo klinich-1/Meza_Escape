@@ -1,78 +1,60 @@
 from __future__ import annotations
 
 import random
-from collections import deque
-from typing import List, Optional
+from typing import Optional
 
-from maze_escape.algorithms import astar, bfs_distances, generate_maze, raycast_fov
+import maze_escape.settings as settings
 from maze_escape.maze import Cell
-from maze_escape.settings import (
-    COLS,
-    CRYSTAL_COUNT,
-    ESCAPE_BLINK_RANGE,
-    ESCAPE_COOLDOWN,
-    HUNTER_STUN_AFTER_BLINK,
-    HUD_HEIGHT,
-    PLAYER_MOVE_DELAY,
-    ROWS,
-    SCREEN_HEIGHT,
-    SCREEN_WIDTH,
-    TILE,
-)
+from maze_escape.game_model import GameModel
 
-# Основная игра управляет состоянием, обновлением и отрисовкой
 
 class Game:
     def __init__(self, pygame_module) -> None:
         self.pg = pygame_module
-        self.screen = self.pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.screen = self.pg.display.set_mode((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT))
+        self.pg.display.set_icon(self.create_window_icon())
         self.pg.display.set_caption("Maze Escape")
         self.clock = self.pg.time.Clock()
-        self.font = self.pg.font.Font(None, 32)
-        self.small_font = self.pg.font.Font(None, 24)
+        self.font = self.pg.font.Font(None, settings.FONT_TITLE_SIZE)
+        self.small_font = self.pg.font.Font(None, settings.FONT_MENU_SIZE)
         self.running = True
         self.rng = random.Random()
-        self.new_game()
-
-    def new_game(self) -> None:
-        self.maze = generate_maze(COLS, ROWS, self.rng)
-        self.player = (1, 1)
-        distances = bfs_distances(self.maze, self.player)
-        farthest = max(distances, key=distances.get)
-        self.exit_cell = farthest
-
-        blocked = {self.player, self.exit_cell}
-        hunter_candidates = sorted(
-            (cell for cell in distances if cell not in blocked),
-            key=lambda cell: distances[cell],
-            reverse=True,
-        )
-        self.hunter = hunter_candidates[min(4, len(hunter_candidates) - 1)]
-        blocked.add(self.hunter)
-
-        crystal_candidates = [
-            cell
-            for cell, distance in distances.items()
-            if cell not in blocked and distance > max(8, distances[farthest] // 4)
+        self.model = GameModel(self.rng)
+        # UI state: 'menu' or 'playing'
+        self.ui_state = "menu"
+        self.menu_options = [
+            settings.DIFFICULTY_LABELS["easy"],
+            settings.DIFFICULTY_LABELS["medium"],
+            settings.DIFFICULTY_LABELS["hard"],
+            "Выход",
         ]
-        self.rng.shuffle(crystal_candidates)
-        self.crystals = set(crystal_candidates[:CRYSTAL_COUNT])
+        self.difficulty_values = ["easy", "medium", "hard"]
+        self.menu_selected = 0
+        self.pause_options = ["Продолжить", "В меню"]
 
-        self.visible = raycast_fov(self.maze, self.player)
-        self.revealed = set(self.visible)
-        self.hunter_path: List[Cell] = []
-        self.enemy_timer = 0.0
-        self.move_timer = 0.0
-        self.held_direction: Optional[Cell] = None
-        self.escape_cooldown = 0.0
-        self.hunter_stun = 0.0
-        self.steps = 0
-        self.status = "playing"
-        self.message = ""
+    def create_window_icon(self):
+        icon = self.pg.Surface((32, 32), self.pg.SRCALPHA)
+        icon.fill((16, 23, 33, 255))
+
+        wall = (29, 42, 58)
+        path = (84, 190, 112)
+        player = (91, 176, 214)
+
+        self.pg.draw.rect(icon, wall, (0, 0, 32, 4))
+        self.pg.draw.rect(icon, wall, (0, 28, 32, 4))
+        self.pg.draw.rect(icon, wall, (0, 0, 4, 32))
+        self.pg.draw.rect(icon, wall, (28, 0, 4, 32))
+
+        self.pg.draw.rect(icon, wall, (8, 8, 16, 4))
+        self.pg.draw.rect(icon, wall, (8, 20, 16, 4))
+        self.pg.draw.rect(icon, path, (12, 12, 8, 8))
+        self.pg.draw.circle(icon, player, (16, 16), 4)
+
+        return icon
 
     @property
     def collected(self) -> int:
-        return CRYSTAL_COUNT - len(self.crystals)
+        return self.model.collected
 
     def run(self) -> None:
         while self.running:
@@ -91,45 +73,77 @@ class Game:
             elif event.type == self.pg.KEYDOWN:
                 if event.key == self.pg.K_ESCAPE:
                     self.running = False
+                elif self.ui_state == "menu":
+                    if event.key in (self.pg.K_UP, self.pg.K_w):
+                        self.menu_selected = (self.menu_selected - 1) % len(self.menu_options)
+                    elif event.key in (self.pg.K_DOWN, self.pg.K_s):
+                        self.menu_selected = (self.menu_selected + 1) % len(self.menu_options)
+                    elif event.key in (self.pg.K_RETURN, self.pg.K_SPACE):
+                        if self.menu_selected < len(self.difficulty_values):
+                            difficulty = self.difficulty_values[self.menu_selected]
+                            self.model.new_game(difficulty)
+                            self.ui_state = "playing"
+                        else:
+                            self.running = False
+                elif self.ui_state == "paused":
+                    if event.key in (self.pg.K_UP, self.pg.K_w):
+                        self.menu_selected = (self.menu_selected - 1) % len(self.pause_options)
+                    elif event.key in (self.pg.K_DOWN, self.pg.K_s):
+                        self.menu_selected = (self.menu_selected + 1) % len(self.pause_options)
+                    elif event.key in (self.pg.K_RETURN, self.pg.K_SPACE, self.pg.K_p):
+                        if self.menu_selected == 0:
+                            self.ui_state = "playing"
+                        else:
+                            self.ui_state = "menu"
+                    elif event.key == self.pg.K_p:
+                        # allow toggling pause with P
+                        self.ui_state = "playing"
                 elif event.key == self.pg.K_r:
-                    self.new_game()
-                elif self.status == "playing":
-                    if event.key == self.pg.K_SPACE:
-                        self.use_escape_blink()
+                    self.model.new_game(self.model.difficulty)
+                elif self.model.status == "playing":
+                    if event.key == self.pg.K_p:
+                        # toggle pause
+                        self.ui_state = "paused"
+                        # reset pause menu selection
+                        self.menu_selected = 0
+                    elif event.key == self.pg.K_SPACE:
+                        self.model.use_escape_blink()
                     else:
                         self.start_held_movement(event.key)
                 elif event.key in (self.pg.K_RETURN, self.pg.K_SPACE):
-                    self.new_game()
+                    # restart after win/lose
+                    next_difficulty = self.model.next_difficulty() if self.model.status == "won" else self.model.difficulty
+                    self.model.new_game(next_difficulty)
+                    self.ui_state = "playing"
 
     def start_held_movement(self, key: int) -> None:
         direction = self.direction_for_key(key)
         if direction is None:
             return
 
-        self.held_direction = direction
-        self.try_move(direction)
-        self.move_timer = PLAYER_MOVE_DELAY
+        self.model.held_direction = direction
+        self.model.try_move(direction)
+        self.model.move_timer = settings.PLAYER_MOVE_DELAY
 
     def update_held_movement(self, dt: float) -> None:
-        self.move_timer = max(0.0, self.move_timer - dt)
+        self.model.move_timer = max(0.0, self.model.move_timer - dt)
         direction = self.current_held_direction()
 
         if direction is None:
-            self.held_direction = None
+            self.model.held_direction = None
             return
 
-        if self.move_timer <= 0:
-            self.held_direction = direction
-            self.try_move(direction)
-            self.move_timer = PLAYER_MOVE_DELAY
+        if self.model.move_timer <= 0:
+            self.model.held_direction = direction
+            self.model.try_move(direction)
+            self.model.move_timer = settings.PLAYER_MOVE_DELAY
 
     def current_held_direction(self) -> Optional[Cell]:
         keys = self.pg.key.get_pressed()
-
-        if self.held_direction is not None:
-            for key in self.keys_for_direction(self.held_direction):
+        if self.model.held_direction is not None:
+            for key in self.keys_for_direction(self.model.held_direction):
                 if keys[key]:
-                    return self.held_direction
+                    return self.model.held_direction
 
         for key in (
             self.pg.K_LEFT,
@@ -168,123 +182,33 @@ class Game:
         }
         return movement.get(key)
 
-    def try_move(self, direction: Cell) -> bool:
-        dx, dy = direction
-        target = (self.player[0] + dx, self.player[1] + dy)
-        if not self.maze.passable(target):
-            self.message = "Блокировка стены"
-            return False
-
-        self.player = target
-        self.steps += 1
-        self.visible = raycast_fov(self.maze, self.player)
-        self.revealed.update(self.visible)
-        self.collect_current_cell()
-        self.check_end_conditions()
-        return True
-
-    def use_escape_blink(self) -> None:
-        if self.escape_cooldown > 0:
-            return
-
-        target = self.find_escape_blink_target()
-        if target == self.player:
-            self.message = "Нет доступной точки для телепорта"
-            return
-
-        self.player = target
-        self.steps += 1
-        self.escape_cooldown = ESCAPE_COOLDOWN
-        self.hunter_stun = HUNTER_STUN_AFTER_BLINK
-        self.enemy_timer = 0.0
-        self.hunter_path = []
-        self.visible = raycast_fov(self.maze, self.player)
-        self.revealed.update(self.visible)
-        self.collect_current_cell()
-        self.check_end_conditions()
-
-    def find_escape_blink_target(self) -> Cell:
-        local_distances = self.reachable_cells_near_player(ESCAPE_BLINK_RANGE)
-        hunter_distances = bfs_distances(self.maze, self.hunter)
-
-        candidates = [
-            cell
-            for cell in local_distances
-            if cell != self.player and cell != self.hunter
-        ]
-        if not candidates:
-            return self.player
-
-        return max(
-            candidates,
-            key=lambda cell: (
-                hunter_distances.get(cell, -1),
-                local_distances[cell],
-                self.rng.random(),
-            ),
-        )
-
-    def reachable_cells_near_player(self, max_distance: int) -> dict[Cell, int]:
-        queue = deque([self.player])
-        distances = {self.player: 0}
-
-        while queue:
-            current = queue.popleft()
-            if distances[current] >= max_distance:
-                continue
-
-            x, y = current
-            for nxt in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                if nxt in distances or not self.maze.passable(nxt):
-                    continue
-                distances[nxt] = distances[current] + 1
-                queue.append(nxt)
-
-        return distances
-
-    def collect_current_cell(self) -> None:
-        if self.player in self.crystals:
-            self.crystals.remove(self.player)
-
     def update(self, dt: float) -> None:
-        if self.status != "playing":
+        # Only update game logic while actively playing (not in menu/pause)
+        if self.ui_state != "playing":
             return
 
-        self.escape_cooldown = max(0.0, self.escape_cooldown - dt)
-        self.hunter_stun = max(0.0, self.hunter_stun - dt)
+        if self.model.status != "playing":
+            return
+
+        self.model.update(dt)
         self.update_held_movement(dt)
-        if self.status != "playing":
-            return
-
-        self.enemy_timer += dt
-        delay = max(0.16, 0.46 - self.collected * 0.03)
-
-        if self.hunter_stun <= 0 and self.enemy_timer >= delay:
-            self.enemy_timer = 0.0
-            self.move_hunter()
-            self.check_end_conditions()
-
-    def move_hunter(self) -> None:
-        self.hunter_path = astar(self.maze, self.hunter, self.player)
-        if len(self.hunter_path) > 1:
-            self.hunter = self.hunter_path[1]
-
-    def check_end_conditions(self) -> None:
-        if self.hunter == self.player:
-            self.status = "lost"
-            self.message = "Caught. Press Enter to restart."
-        elif self.player == self.exit_cell and not self.crystals:
-            self.status = "won"
-            self.message = "Escaped. Press Enter for a new maze."
 
     def draw(self) -> None:
         self.screen.fill((7, 10, 18))
+
+        if self.ui_state == "menu":
+            self.draw_menu()
+            self.pg.display.flip()
+            return
+
         self.draw_hud()
         self.draw_maze()
         self.draw_path_hint()
         self.draw_entities()
 
-        if self.status != "playing":
+        if self.ui_state == "paused":
+            self.draw_pause()
+        elif self.model.status != "playing":
             self.draw_overlay()
 
         self.pg.display.flip()
@@ -294,43 +218,45 @@ class Game:
 
         title = self.font.render("Maze Escape", True, (239, 241, 225))
         self.screen.blit(title, (18, 19))
-        self.pg.draw.rect(self.screen, (237, 195, 82), (18, 50, 104, 3), border_radius=2)
 
         self.draw_stat_card(
-            SCREEN_WIDTH - 322,
+            settings.SCREEN_WIDTH - 322,
             (246, 207, 94),
-            f"{self.collected}/{CRYSTAL_COUNT}",
+            f"{self.collected}/{self.model.crystal_count}",
             "crystal",
         )
         self.draw_stat_card(
-            SCREEN_WIDTH - 214,
+            settings.SCREEN_WIDTH - 214,
             (98, 176, 214),
-            str(self.steps),
+            str(self.model.steps),
             "steps",
         )
         self.draw_stat_card(
-            SCREEN_WIDTH - 106,
+            settings.SCREEN_WIDTH - 106,
             (102, 214, 147),
             self.blink_label(),
             "blink",
         )
+        difficulty = settings.DIFFICULTY_LABELS.get(self.model.difficulty, "Средне")
+        diff_text = self.small_font.render(f"Сложность: {difficulty}", True, (150, 150, 150))
+        self.screen.blit(diff_text, (18, 50))
 
     def draw_hud_background(self) -> None:
         top = (9, 12, 22)
         bottom = (19, 24, 37)
-        for y in range(HUD_HEIGHT):
-            factor = y / max(1, HUD_HEIGHT - 1)
+        for y in range(settings.HUD_HEIGHT):
+            factor = y / max(1, settings.HUD_HEIGHT - 1)
             color = tuple(
                 int(top[i] + (bottom[i] - top[i]) * factor)
                 for i in range(3)
             )
-            self.pg.draw.line(self.screen, color, (0, y), (SCREEN_WIDTH, y))
+            self.pg.draw.line(self.screen, color, (0, y), (settings.SCREEN_WIDTH, y))
 
         self.pg.draw.line(
             self.screen,
             (48, 66, 82),
-            (0, HUD_HEIGHT - 1),
-            (SCREEN_WIDTH, HUD_HEIGHT - 1),
+            (0, settings.HUD_HEIGHT - 1),
+            (settings.SCREEN_WIDTH, settings.HUD_HEIGHT - 1),
             2,
         )
 
@@ -352,9 +278,9 @@ class Game:
         self.screen.blit(text, text_rect)
 
     def blink_label(self) -> str:
-        if self.escape_cooldown <= 0:
+        if self.model.escape_cooldown <= 0:
             return "OK"
-        return f"{self.escape_cooldown:.1f}s"
+        return f"{self.model.escape_cooldown:.1f}s"
 
     def draw_crystal_icon(self, center: Cell, color: tuple[int, int, int]) -> None:
         x, y = center
@@ -374,62 +300,62 @@ class Game:
         self.pg.draw.polygon(self.screen, color, points)
 
     def draw_maze(self) -> None:
-        for y in range(ROWS):
-            for x in range(COLS):
+        for y in range(settings.ROWS):
+            for x in range(settings.COLS):
                 cell = (x, y)
                 rect = self.cell_rect(cell)
 
-                if cell not in self.revealed:
+                if cell not in self.model.revealed:
                     color = (5, 7, 12)
-                elif cell in self.maze.walls:
-                    color = (29, 42, 58) if cell in self.visible else (16, 23, 33)
+                elif cell in self.model.maze.walls:
+                    color = (29, 42, 58) if cell in self.model.visible else (16, 23, 33)
                 else:
-                    color = (36, 45, 43) if cell in self.visible else (20, 27, 28)
+                    color = (36, 45, 43) if cell in self.model.visible else (20, 27, 28)
 
                 self.pg.draw.rect(self.screen, color, rect)
 
-        exit_color = (84, 190, 112) if not self.crystals else (142, 77, 62)
-        if self.exit_cell in self.revealed:
+        exit_color = (84, 190, 112) if not self.model.crystals else (142, 77, 62)
+        if self.model.exit_cell in self.model.revealed:
             self.pg.draw.rect(
                 self.screen,
                 exit_color,
-                self.cell_rect(self.exit_cell).inflate(-8, -8),
+                self.cell_rect(self.model.exit_cell).inflate(-8, -8),
                 border_radius=4,
             )
 
-        for crystal in self.crystals:
-            if crystal in self.visible:
+        for crystal in self.model.crystals:
+            if crystal in self.model.visible:
                 cx, cy = self.cell_center(crystal)
                 self.pg.draw.circle(self.screen, (246, 207, 94), (cx, cy), 7)
                 self.pg.draw.circle(self.screen, (255, 246, 172), (cx - 2, cy - 2), 3)
 
     def draw_path_hint(self) -> None:
-        if self.status != "playing":
+        if self.model.status != "playing":
             return
 
-        for cell in self.hunter_path[1:10]:
-            if cell not in self.revealed or cell in self.maze.walls:
+        for cell in self.model.hunter_path[1:10]:
+            if cell not in self.model.revealed or cell in self.model.maze.walls:
                 continue
             cx, cy = self.cell_center(cell)
             self.pg.draw.circle(self.screen, (122, 55, 64), (cx, cy), 3)
 
     def draw_entities(self) -> None:
-        px, py = self.cell_center(self.player)
+        px, py = self.cell_center(self.model.player)
         self.pg.draw.circle(self.screen, (91, 176, 214), (px, py), 10)
         self.pg.draw.circle(self.screen, (202, 244, 255), (px - 3, py - 3), 4)
 
-        if self.hunter in self.visible:
-            hx, hy = self.cell_center(self.hunter)
+        if self.model.hunter in self.model.visible:
+            hx, hy = self.cell_center(self.model.hunter)
             self.pg.draw.circle(self.screen, (216, 72, 82), (hx, hy), 10)
             self.pg.draw.circle(self.screen, (255, 168, 142), (hx - 3, hy - 3), 4)
 
     def draw_overlay(self) -> None:
-        overlay = self.pg.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), self.pg.SRCALPHA)
+        overlay = self.pg.Surface((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT), self.pg.SRCALPHA)
         overlay.fill((3, 5, 9, 178))
         self.screen.blit(overlay, (0, 0))
 
-        text = self.font.render(self.message, True, (245, 240, 220))
-        rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        text = self.font.render(self.model.message, True, (245, 240, 220))
+        rect = text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2))
         self.pg.draw.rect(
             self.screen,
             (28, 34, 43),
@@ -438,17 +364,62 @@ class Game:
         )
         self.screen.blit(text, rect)
 
+    def draw_menu(self) -> None:
+        title = self.font.render("Maze Escape", True, (239, 241, 225))
+        title_rect = title.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 3 - 40))
+        self.screen.blit(title, title_rect)
+
+        subtitle = self.small_font.render("Выберите уровень сложности:", True, (200, 200, 200))
+        subtitle_rect = subtitle.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 3 + 20))
+        self.screen.blit(subtitle, subtitle_rect)
+
+        for i, option in enumerate(self.menu_options):
+            is_selected = i == self.menu_selected
+            color = (246, 207, 94) if is_selected else (200, 200, 200)
+            
+            if is_selected:
+                opt_text = self.small_font.render(f"  > {option} <  ", True, color)
+            else:
+                opt_text = self.small_font.render(f"    {option}    ", True, color)
+            
+            rect = opt_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + i * 50))
+            
+            if is_selected:
+                box = self.pg.Rect(rect.x - 5, rect.y - 5, rect.width + 10, rect.height + 10)
+                self.pg.draw.rect(self.screen, (246, 207, 94), box, 2)
+            
+            self.screen.blit(opt_text, rect)
+
+    def draw_pause(self) -> None:
+        overlay = self.pg.Surface((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT), self.pg.SRCALPHA)
+        overlay.fill((3, 5, 9, 178))
+        self.screen.blit(overlay, (0, 0))
+
+        title = self.font.render("Пауза", True, (239, 241, 225))
+        title_rect = title.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 3))
+        self.screen.blit(title, title_rect)
+
+        for i, option in enumerate(self.pause_options):
+            is_selected = i == self.menu_selected
+            color = (246, 207, 94) if is_selected else (200, 200, 200)
+            
+            if is_selected:
+                opt_text = self.small_font.render(f"  > {option} <  ", True, color)
+            else:
+                opt_text = self.small_font.render(f"    {option}    ", True, color)
+            
+            rect = opt_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + i * 50))
+            
+            if is_selected:
+                box = self.pg.Rect(rect.x - 5, rect.y - 5, rect.width + 10, rect.height + 10)
+                self.pg.draw.rect(self.screen, (246, 207, 94), box, 2)
+            
+            self.screen.blit(opt_text, rect)
+
     def cell_rect(self, cell: Cell):
         x, y = cell
-        return self.pg.Rect(x * TILE, HUD_HEIGHT + y * TILE, TILE, TILE)
+        return self.pg.Rect(x * settings.TILE, settings.HUD_HEIGHT + y * settings.TILE, settings.TILE, settings.TILE)
 
     def cell_center(self, cell: Cell) -> Cell:
         x, y = cell
-        return x * TILE + TILE // 2, HUD_HEIGHT + y * TILE + TILE // 2
-# Улучшен интерфейс
-
-# Улучшена читаемость игрового цикла
-
-# Обновлена логика отрисовки интерфейса
-
-# Инициализация игрового состояния
+        return x * settings.TILE + settings.TILE // 2, settings.HUD_HEIGHT + y * settings.TILE + settings.TILE // 2
