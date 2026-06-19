@@ -3,9 +3,6 @@ from __future__ import annotations
 import sys
 from typing import Optional, Sequence
 
-from maze_escape.self_test import run_self_test
-
-# Точка входа для запуска игры и самотестирования
 
 def run_game() -> int:
     try:
@@ -22,15 +19,6 @@ def run_game() -> int:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = list(sys.argv[1:] if argv is None else argv)
+    _ = list(sys.argv[1:] if argv is None else argv)
 
-    if "--self-test" in args:
-        return run_self_test()
-
-    # Запуск основного игрового цикла
     return run_game()
-# Main
-
-# Точка входа программы
-
-# Управление аргументами командной строки
