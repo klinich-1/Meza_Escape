@@ -20,7 +20,6 @@ class Game:
         self.running = True
         self.rng = random.Random()
         self.model = GameModel(self.rng)
-        # UI state: 'menu' or 'playing'
         self.ui_state = "menu"
         self.menu_options = [
             settings.DIFFICULTY_LABELS["easy"],
@@ -33,22 +32,18 @@ class Game:
         self.pause_options = ["Продолжить", "В меню"]
 
     def create_window_icon(self):
-        icon = self.pg.Surface((32, 32), self.pg.SRCALPHA)
-        icon.fill((16, 23, 33, 255))
+        icon = self.pg.Surface((settings.ICON_SIZE, settings.ICON_SIZE), self.pg.SRCALPHA)
+        icon.fill(settings.COLOR_ICON_BG)
 
-        wall = (29, 42, 58)
-        path = (84, 190, 112)
-        player = (91, 176, 214)
+        self.pg.draw.rect(icon, settings.COLOR_ICON_WALL, (0, 0, settings.ICON_SIZE, 4))
+        self.pg.draw.rect(icon, settings.COLOR_ICON_WALL, (0, settings.ICON_SIZE - 4, settings.ICON_SIZE, 4))
+        self.pg.draw.rect(icon, settings.COLOR_ICON_WALL, (0, 0, 4, settings.ICON_SIZE))
+        self.pg.draw.rect(icon, settings.COLOR_ICON_WALL, (settings.ICON_SIZE - 4, 0, 4, settings.ICON_SIZE))
 
-        self.pg.draw.rect(icon, wall, (0, 0, 32, 4))
-        self.pg.draw.rect(icon, wall, (0, 28, 32, 4))
-        self.pg.draw.rect(icon, wall, (0, 0, 4, 32))
-        self.pg.draw.rect(icon, wall, (28, 0, 4, 32))
-
-        self.pg.draw.rect(icon, wall, (8, 8, 16, 4))
-        self.pg.draw.rect(icon, wall, (8, 20, 16, 4))
-        self.pg.draw.rect(icon, path, (12, 12, 8, 8))
-        self.pg.draw.circle(icon, player, (16, 16), 4)
+        self.pg.draw.rect(icon, settings.COLOR_ICON_WALL, (8, 8, 16, 4))
+        self.pg.draw.rect(icon, settings.COLOR_ICON_WALL, (8, 20, 16, 4))
+        self.pg.draw.rect(icon, settings.COLOR_ICON_PATH, (12, 12, 8, 8))
+        self.pg.draw.circle(icon, settings.COLOR_ICON_PLAYER, (16, 16), 4)
 
         return icon
 
@@ -58,7 +53,6 @@ class Game:
 
     def run(self) -> None:
         while self.running:
-            # Цикл игры обновляет состояние и перерисовывает кадр
             dt = self.clock.tick(60) / 1000.0
             self.handle_events()
             self.update(dt)
@@ -96,22 +90,18 @@ class Game:
                         else:
                             self.ui_state = "menu"
                     elif event.key == self.pg.K_p:
-                        # allow toggling pause with P
                         self.ui_state = "playing"
                 elif event.key == self.pg.K_r:
                     self.model.new_game(self.model.difficulty)
                 elif self.model.status == "playing":
                     if event.key == self.pg.K_p:
-                        # toggle pause
                         self.ui_state = "paused"
-                        # reset pause menu selection
                         self.menu_selected = 0
                     elif event.key == self.pg.K_SPACE:
                         self.model.use_escape_blink()
                     else:
                         self.start_held_movement(event.key)
                 elif event.key in (self.pg.K_RETURN, self.pg.K_SPACE):
-                    # restart after win/lose
                     next_difficulty = self.model.next_difficulty() if self.model.status == "won" else self.model.difficulty
                     self.model.new_game(next_difficulty)
                     self.ui_state = "playing"
@@ -183,7 +173,6 @@ class Game:
         return movement.get(key)
 
     def update(self, dt: float) -> None:
-        # Only update game logic while actively playing (not in menu/pause)
         if self.ui_state != "playing":
             return
 
@@ -194,7 +183,7 @@ class Game:
         self.update_held_movement(dt)
 
     def draw(self) -> None:
-        self.screen.fill((7, 10, 18))
+        self.screen.fill(settings.COLOR_BG)
 
         if self.ui_state == "menu":
             self.draw_menu()
@@ -216,34 +205,34 @@ class Game:
     def draw_hud(self) -> None:
         self.draw_hud_background()
 
-        title = self.font.render("Maze Escape", True, (239, 241, 225))
-        self.screen.blit(title, (18, 19))
+        title = self.font.render("Maze Escape", True, settings.COLOR_TITLE_TEXT)
+        self.screen.blit(title, (settings.TITLE_POS_X, settings.TITLE_POS_Y))
 
         self.draw_stat_card(
             settings.SCREEN_WIDTH - 322,
-            (246, 207, 94),
+            settings.COLOR_STAT_CRYSTAL,
             f"{self.collected}/{self.model.crystal_count}",
             "crystal",
         )
         self.draw_stat_card(
             settings.SCREEN_WIDTH - 214,
-            (98, 176, 214),
+            settings.COLOR_STAT_STEPS,
             str(self.model.steps),
             "steps",
         )
         self.draw_stat_card(
             settings.SCREEN_WIDTH - 106,
-            (102, 214, 147),
+            settings.COLOR_STAT_BLINK,
             self.blink_label(),
             "blink",
         )
         difficulty = settings.DIFFICULTY_LABELS.get(self.model.difficulty, "Средне")
-        diff_text = self.small_font.render(f"Сложность: {difficulty}", True, (150, 150, 150))
-        self.screen.blit(diff_text, (18, 50))
+        diff_text = self.small_font.render(f"Сложность: {difficulty}", True, settings.COLOR_MUTED_TEXT)
+        self.screen.blit(diff_text, (settings.DIFFICULTY_POS_X, settings.DIFFICULTY_POS_Y))
 
     def draw_hud_background(self) -> None:
-        top = (9, 12, 22)
-        bottom = (19, 24, 37)
+        top = settings.COLOR_HUD_TOP
+        bottom = settings.COLOR_HUD_BOTTOM
         for y in range(settings.HUD_HEIGHT):
             factor = y / max(1, settings.HUD_HEIGHT - 1)
             color = tuple(
@@ -254,18 +243,18 @@ class Game:
 
         self.pg.draw.line(
             self.screen,
-            (48, 66, 82),
+            settings.COLOR_HUD_LINE,
             (0, settings.HUD_HEIGHT - 1),
             (settings.SCREEN_WIDTH, settings.HUD_HEIGHT - 1),
             2,
         )
 
     def draw_stat_card(self, x: int, color: tuple[int, int, int], value: str, icon: str) -> None:
-        rect = self.pg.Rect(x, 17, 90, 40)
-        self.pg.draw.rect(self.screen, (25, 31, 45), rect, border_radius=7)
-        self.pg.draw.rect(self.screen, (48, 60, 76), rect, 1, border_radius=7)
+        rect = self.pg.Rect(x, settings.STAT_CARD_Y, settings.STAT_CARD_WIDTH, settings.STAT_CARD_HEIGHT)
+        self.pg.draw.rect(self.screen, settings.COLOR_CARD_BG, rect, border_radius=7)
+        self.pg.draw.rect(self.screen, settings.COLOR_CARD_BORDER, rect, 1, border_radius=7)
 
-        icon_center = (x + 19, 37)
+        icon_center = (x + settings.STAT_ICON_OFFSET_X, settings.STAT_ICON_CENTER_Y)
         if icon == "crystal":
             self.draw_crystal_icon(icon_center, color)
         elif icon == "steps":
@@ -273,8 +262,8 @@ class Game:
         else:
             self.draw_blink_icon(icon_center, color)
 
-        text = self.small_font.render(value, True, (226, 234, 226))
-        text_rect = text.get_rect(midleft=(x + 38, 37))
+        text = self.small_font.render(value, True, settings.COLOR_CARD_TEXT)
+        text_rect = text.get_rect(midleft=(x + settings.STAT_TEXT_OFFSET_X, settings.STAT_ICON_CENTER_Y))
         self.screen.blit(text, text_rect)
 
     def blink_label(self) -> str:
@@ -286,13 +275,13 @@ class Game:
         x, y = center
         points = [(x, y - 10), (x + 8, y), (x, y + 10), (x - 8, y)]
         self.pg.draw.polygon(self.screen, color, points)
-        self.pg.draw.polygon(self.screen, (255, 246, 172), [(x, y - 7), (x + 4, y), (x, y + 3)])
+        self.pg.draw.polygon(self.screen, settings.COLOR_CRYSTAL_HIGHLIGHT, [(x, y - 7), (x + 4, y), (x, y + 3)])
 
     def draw_steps_icon(self, center: Cell, color: tuple[int, int, int]) -> None:
         x, y = center
         self.pg.draw.circle(self.screen, color, (x - 4, y + 4), 5)
         self.pg.draw.circle(self.screen, color, (x + 5, y - 5), 5)
-        self.pg.draw.circle(self.screen, (184, 225, 238), (x - 5, y + 2), 2)
+        self.pg.draw.circle(self.screen, settings.COLOR_STEPS_HIGHLIGHT, (x - 5, y + 2), 2)
 
     def draw_blink_icon(self, center: Cell, color: tuple[int, int, int]) -> None:
         x, y = center
@@ -306,15 +295,15 @@ class Game:
                 rect = self.cell_rect(cell)
 
                 if cell not in self.model.revealed:
-                    color = (5, 7, 12)
+                    color = settings.COLOR_MAZE_UNSEEN
                 elif cell in self.model.maze.walls:
-                    color = (29, 42, 58) if cell in self.model.visible else (16, 23, 33)
+                    color = settings.COLOR_MAZE_WALL_VISIBLE if cell in self.model.visible else settings.COLOR_MAZE_WALL_HIDDEN
                 else:
-                    color = (36, 45, 43) if cell in self.model.visible else (20, 27, 28)
+                    color = settings.COLOR_MAZE_FLOOR_VISIBLE if cell in self.model.visible else settings.COLOR_MAZE_FLOOR_HIDDEN
 
                 self.pg.draw.rect(self.screen, color, rect)
 
-        exit_color = (84, 190, 112) if not self.model.crystals else (142, 77, 62)
+        exit_color = settings.COLOR_EXIT_READY if not self.model.crystals else settings.COLOR_EXIT_LOCKED
         if self.model.exit_cell in self.model.revealed:
             self.pg.draw.rect(
                 self.screen,
@@ -326,8 +315,8 @@ class Game:
         for crystal in self.model.crystals:
             if crystal in self.model.visible:
                 cx, cy = self.cell_center(crystal)
-                self.pg.draw.circle(self.screen, (246, 207, 94), (cx, cy), 7)
-                self.pg.draw.circle(self.screen, (255, 246, 172), (cx - 2, cy - 2), 3)
+                self.pg.draw.circle(self.screen, settings.COLOR_STAT_CRYSTAL, (cx, cy), settings.CRYSTAL_RADIUS)
+                self.pg.draw.circle(self.screen, settings.COLOR_CRYSTAL_HIGHLIGHT, (cx - 2, cy - 2), settings.CRYSTAL_GLOW_RADIUS)
 
     def draw_path_hint(self) -> None:
         if self.model.status != "playing":
@@ -337,82 +326,92 @@ class Game:
             if cell not in self.model.revealed or cell in self.model.maze.walls:
                 continue
             cx, cy = self.cell_center(cell)
-            self.pg.draw.circle(self.screen, (122, 55, 64), (cx, cy), 3)
+            self.pg.draw.circle(self.screen, settings.COLOR_PATH_HINT, (cx, cy), settings.PATH_HINT_RADIUS)
 
     def draw_entities(self) -> None:
         px, py = self.cell_center(self.model.player)
-        self.pg.draw.circle(self.screen, (91, 176, 214), (px, py), 10)
-        self.pg.draw.circle(self.screen, (202, 244, 255), (px - 3, py - 3), 4)
+        self.pg.draw.circle(self.screen, settings.COLOR_PLAYER, (px, py), settings.ENTITY_RADIUS)
+        self.pg.draw.circle(self.screen, settings.COLOR_PLAYER_LIGHT, (px - 3, py - 3), settings.ENTITY_GLOW_RADIUS)
 
         if self.model.hunter in self.model.visible:
             hx, hy = self.cell_center(self.model.hunter)
-            self.pg.draw.circle(self.screen, (216, 72, 82), (hx, hy), 10)
-            self.pg.draw.circle(self.screen, (255, 168, 142), (hx - 3, hy - 3), 4)
+            self.pg.draw.circle(self.screen, settings.COLOR_HUNTER, (hx, hy), settings.ENTITY_RADIUS)
+            self.pg.draw.circle(self.screen, settings.COLOR_HUNTER_LIGHT, (hx - 3, hy - 3), settings.ENTITY_GLOW_RADIUS)
 
     def draw_overlay(self) -> None:
         overlay = self.pg.Surface((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT), self.pg.SRCALPHA)
-        overlay.fill((3, 5, 9, 178))
+        overlay.fill(settings.COLOR_OVERLAY)
         self.screen.blit(overlay, (0, 0))
 
-        text = self.font.render(self.model.message, True, (245, 240, 220))
+        text = self.font.render(self.model.message, True, settings.COLOR_OVERLAY_TEXT)
         rect = text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2))
         self.pg.draw.rect(
             self.screen,
-            (28, 34, 43),
+            settings.COLOR_OVERLAY_BOX,
             rect.inflate(44, 28),
             border_radius=8,
         )
         self.screen.blit(text, rect)
 
     def draw_menu(self) -> None:
-        title = self.font.render("Maze Escape", True, (239, 241, 225))
+        title = self.font.render("Maze Escape", True, settings.COLOR_TITLE_TEXT)
         title_rect = title.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 3 - 40))
         self.screen.blit(title, title_rect)
 
-        subtitle = self.small_font.render("Выберите уровень сложности:", True, (200, 200, 200))
+        subtitle = self.small_font.render("Выберите уровень сложности:", True, settings.COLOR_SUBTITLE_TEXT)
         subtitle_rect = subtitle.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 3 + 20))
         self.screen.blit(subtitle, subtitle_rect)
 
         for i, option in enumerate(self.menu_options):
             is_selected = i == self.menu_selected
-            color = (246, 207, 94) if is_selected else (200, 200, 200)
+            color = settings.COLOR_STAT_CRYSTAL if is_selected else settings.COLOR_SUBTITLE_TEXT
             
             if is_selected:
                 opt_text = self.small_font.render(f"  > {option} <  ", True, color)
             else:
                 opt_text = self.small_font.render(f"    {option}    ", True, color)
             
-            rect = opt_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + i * 50))
+            rect = opt_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + i * settings.MENU_SPACING_Y))
             
             if is_selected:
-                box = self.pg.Rect(rect.x - 5, rect.y - 5, rect.width + 10, rect.height + 10)
-                self.pg.draw.rect(self.screen, (246, 207, 94), box, 2)
+                box = self.pg.Rect(
+                    rect.x - settings.MENU_BOX_PADDING,
+                    rect.y - settings.MENU_BOX_PADDING,
+                    rect.width + settings.MENU_BOX_PADDING * 2,
+                    rect.height + settings.MENU_BOX_PADDING * 2,
+                )
+                self.pg.draw.rect(self.screen, settings.COLOR_STAT_CRYSTAL, box, settings.MENU_BOX_BORDER)
             
             self.screen.blit(opt_text, rect)
 
     def draw_pause(self) -> None:
         overlay = self.pg.Surface((settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT), self.pg.SRCALPHA)
-        overlay.fill((3, 5, 9, 178))
+        overlay.fill(settings.COLOR_OVERLAY)
         self.screen.blit(overlay, (0, 0))
 
-        title = self.font.render("Пауза", True, (239, 241, 225))
+        title = self.font.render("Пауза", True, settings.COLOR_TITLE_TEXT)
         title_rect = title.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 3))
         self.screen.blit(title, title_rect)
 
         for i, option in enumerate(self.pause_options):
             is_selected = i == self.menu_selected
-            color = (246, 207, 94) if is_selected else (200, 200, 200)
+            color = settings.COLOR_STAT_CRYSTAL if is_selected else settings.COLOR_SUBTITLE_TEXT
             
             if is_selected:
                 opt_text = self.small_font.render(f"  > {option} <  ", True, color)
             else:
                 opt_text = self.small_font.render(f"    {option}    ", True, color)
             
-            rect = opt_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + i * 50))
+            rect = opt_text.get_rect(center=(settings.SCREEN_WIDTH // 2, settings.SCREEN_HEIGHT // 2 + i * settings.MENU_SPACING_Y))
             
             if is_selected:
-                box = self.pg.Rect(rect.x - 5, rect.y - 5, rect.width + 10, rect.height + 10)
-                self.pg.draw.rect(self.screen, (246, 207, 94), box, 2)
+                box = self.pg.Rect(
+                    rect.x - settings.MENU_BOX_PADDING,
+                    rect.y - settings.MENU_BOX_PADDING,
+                    rect.width + settings.MENU_BOX_PADDING * 2,
+                    rect.height + settings.MENU_BOX_PADDING * 2,
+                )
+                self.pg.draw.rect(self.screen, settings.COLOR_STAT_CRYSTAL, box, settings.MENU_BOX_BORDER)
             
             self.screen.blit(opt_text, rect)
 

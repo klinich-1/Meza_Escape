@@ -160,7 +160,6 @@ class GameModel:
 
         self.escape_cooldown = max(0.0, self.escape_cooldown - dt)
         self.hunter_stun = max(0.0, self.hunter_stun - dt)
-        # held movement timers are managed by the app input loop (move_timer / held_direction)
 
         self.enemy_timer += dt
         delay = max(0.12, (0.46 - self.collected * 0.03) / self.hunter_speed_factor)

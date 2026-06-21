@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import sys
-from typing import Optional, Sequence
-
-
 def run_game() -> int:
     try:
         import pygame
@@ -18,7 +14,5 @@ def run_game() -> int:
     return 0
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    _ = list(sys.argv[1:] if argv is None else argv)
-
+def main() -> int:
     return run_game()
