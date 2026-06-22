@@ -31,13 +31,17 @@ class TestGameModel(unittest.TestCase):
         self.assertNotEqual(self.model.player, (1, 1))
 
     def test_try_move_fails_against_wall(self) -> None:
-        if self.model.maze.passable((2, 1)):
-            self.skipTest("Maze layout has no immediate right wall")
-
-        moved = self.model.try_move((1, 0))
-        self.assertFalse(moved)
-        self.assertEqual(self.model.player, (1, 1))
-        self.assertEqual(self.model.steps, 0)
+        original_player = self.model.player
+        for direction in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+            target = (original_player[0] + direction[0], original_player[1] + direction[1])
+            if not self.model.maze.passable(target):
+                moved = self.model.try_move(direction)
+                self.assertFalse(moved)
+                self.assertEqual(self.model.player, original_player)
+                self.assertEqual(self.model.steps, 0)
+                return
+        
+        self.skipTest("Не найдена непроходимая клетка рядом со стартом")
 
     def test_use_escape_blink_sets_cooldown(self) -> None:
         self.model.use_escape_blink()

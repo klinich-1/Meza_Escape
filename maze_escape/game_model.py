@@ -78,18 +78,21 @@ class GameModel:
     def collected(self) -> int:
         return self.crystal_count - len(self.crystals)
 
-    def try_move(self, direction: Cell) -> bool:
-        dx, dy = direction
-        target = (self.player[0] + dx, self.player[1] + dy)
-        if not self.maze.passable(target):
-            return False
-
+    def _finalize_move(self, target: Cell) -> None:
         self.player = target
         self.steps += 1
         self.visible = raycast_fov(self.maze, self.player, radius=self.fov_radius)
         self.revealed.update(self.visible)
         self.collect_current_cell()
         self.check_end_conditions()
+
+    def try_move(self, direction: Cell) -> bool:
+        dx, dy = direction
+        target = (self.player[0] + dx, self.player[1] + dy)
+        if not self.maze.passable(target):
+            return False
+
+        self._finalize_move(target)
         return True
 
     def use_escape_blink(self) -> None:
@@ -100,16 +103,11 @@ class GameModel:
         if target == self.player:
             return
 
-        self.player = target
-        self.steps += 1
         self.escape_cooldown = self.escape_cooldown_duration
         self.hunter_stun = HUNTER_STUN_AFTER_BLINK
         self.enemy_timer = 0.0
         self.hunter_path = []
-        self.visible = raycast_fov(self.maze, self.player, radius=self.fov_radius)
-        self.revealed.update(self.visible)
-        self.collect_current_cell()
-        self.check_end_conditions()
+        self._finalize_move(target)
 
     def find_escape_blink_target(self) -> Cell:
         local_distances = self.reachable_cells_near_player(self.escape_blink_range)

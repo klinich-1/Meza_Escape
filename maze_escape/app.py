@@ -106,14 +106,16 @@ class Game:
                     self.model.new_game(next_difficulty)
                     self.ui_state = "playing"
 
+    def _perform_movement(self, direction: Cell) -> None:
+        self.model.held_direction = direction
+        self.model.try_move(direction)
+        self.model.move_timer = settings.PLAYER_MOVE_DELAY
+
     def start_held_movement(self, key: int) -> None:
         direction = self.direction_for_key(key)
         if direction is None:
             return
-
-        self.model.held_direction = direction
-        self.model.try_move(direction)
-        self.model.move_timer = settings.PLAYER_MOVE_DELAY
+        self._perform_movement(direction)
 
     def update_held_movement(self, dt: float) -> None:
         self.model.move_timer = max(0.0, self.model.move_timer - dt)
@@ -124,9 +126,7 @@ class Game:
             return
 
         if self.model.move_timer <= 0:
-            self.model.held_direction = direction
-            self.model.try_move(direction)
-            self.model.move_timer = settings.PLAYER_MOVE_DELAY
+            self._perform_movement(direction)
 
     def current_held_direction(self) -> Optional[Cell]:
         keys = self.pg.key.get_pressed()

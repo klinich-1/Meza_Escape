@@ -19,7 +19,6 @@ def neighbors4(cell: Cell) -> Iterable[Cell]:
 
 
 def generate_maze(cols: int, rows: int, rng: random.Random, extra_passages: Optional[int] = None) -> Maze:
-    """Algorithm 1: randomized depth-first search maze generation."""
     grid = [[True for _ in range(cols)] for _ in range(rows)]
     start = (1, 1)
     grid[start[1]][start[0]] = False
@@ -69,7 +68,6 @@ def bfs_distances(maze: Maze, start: Cell) -> Dict[Cell, int]:
 
 
 def astar(maze: Maze, start: Cell, goal: Cell) -> List[Cell]:
-    """Algorithm 2: A* pathfinding with a Manhattan-distance heuristic."""
     if start == goal:
         return [start]
 
@@ -109,7 +107,6 @@ def raycast_fov(
     radius: int = FOV_RADIUS,
     ray_count: int = FOV_RAYS,
 ) -> Set[Cell]:
-    """Algorithm 3: grid field-of-view using DDA-style ray casting."""
     visible = {origin}
     ox = origin[0] + 0.5
     oy = origin[1] + 0.5
